@@ -1,5 +1,7 @@
 # OpenCodex token-import patch
 
+[English](README.md) | [한국어](README.ko.md) | [简体中文](README.zh-CN.md)
+
 This repository contains a patch and a Bun launcher that add local JSON account
 import to [OpenCodex](https://github.com/lidge-jun/opencodex). It is not a fork
 of OpenCodex and does not vendor its source tree.
