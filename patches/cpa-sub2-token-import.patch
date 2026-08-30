@@ -106,7 +106,7 @@ index 1c86d91..8d065a6 100644
            />
          )}
 diff --git a/gui/src/components/add-codex-account-pick-step.tsx b/gui/src/components/add-codex-account-pick-step.tsx
-index a205017..d26ce1b 100644
+index a205017..999d9eb 100644
 --- a/gui/src/components/add-codex-account-pick-step.tsx
 +++ b/gui/src/components/add-codex-account-pick-step.tsx
 @@ -1,20 +1,38 @@
@@ -172,7 +172,7 @@ index a205017..d26ce1b 100644
 +            <IconGlobe width={20} />
 +            <div>
 +              <div className="title">{t("codexAuth.importFormatUpload", { format })}</div>
-+              <div className="sub">{t("codexAuth.importBtn")}</div>
++              <div className="sub">{t("codexAuth.importFormatCredentialPrompt", { format })}</div>
 +            </div>
 +          </div>
 +        </button>
@@ -230,14 +230,15 @@ index a205017..d26ce1b 100644
        {error && <div className="notice notice-err" style={{ marginTop: 8 }}>{error}</div>}
  
 diff --git a/gui/src/i18n/de.ts b/gui/src/i18n/de.ts
-index 36d058a..fab74c5 100644
+index 36d058a..ade268c 100644
 --- a/gui/src/i18n/de.ts
 +++ b/gui/src/i18n/de.ts
-@@ -1291,6 +1291,14 @@ export const de: Record<TKey, string> = {
+@@ -1291,6 +1291,15 @@ export const de: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json-Inhalt",
    "codexAuth.addHelp": "Kopiere von ~/.codex/auth.json einer anderen Maschine oder nutze codex-auth export.",
    "codexAuth.importBtn": "Importieren",
-+  "codexAuth.importFormatUpload": "{format}-Format hochladen",
++  "codexAuth.importFormatUpload": "{format}-Token importieren",
++  "codexAuth.importFormatCredentialPrompt": "{format}-Anmeldedaten hochladen oder einfügen",
 +  "codexAuth.importFormatImport": "{format}-Format importieren",
 +  "codexAuth.importFormatPrompt": "Datei-Upload oder JSON-Einfügen auswählen.",
 +  "codexAuth.importChangeFormat": "Format ändern",
@@ -249,14 +250,15 @@ index 36d058a..fab74c5 100644
    "codexAuth.importMissingTokens": "access_token oder refresh_token fehlen in JSON",
    "codexAuth.importMissingId": "Konto-ID ist erforderlich",
 diff --git a/gui/src/i18n/en.ts b/gui/src/i18n/en.ts
-index 703fa71..f2178f2 100644
+index 703fa71..c865513 100644
 --- a/gui/src/i18n/en.ts
 +++ b/gui/src/i18n/en.ts
-@@ -1794,6 +1794,14 @@ export const en = {
+@@ -1794,6 +1794,15 @@ export const en = {
    "codexAuth.addJsonLabel": "auth.json content",
    "codexAuth.addHelp": "Copy from another machine's ~/.codex/auth.json, or use codex-auth export.",
    "codexAuth.importBtn": "Import",
-+  "codexAuth.importFormatUpload": "Upload {format} format",
++  "codexAuth.importFormatUpload": "Import {format} Token",
++  "codexAuth.importFormatCredentialPrompt": "Upload or Paste {format} Credential",
 +  "codexAuth.importFormatImport": "Import {format} format",
 +  "codexAuth.importFormatPrompt": "Choose a file upload or JSON paste.",
 +  "codexAuth.importChangeFormat": "Change format",
@@ -268,14 +270,15 @@ index 703fa71..f2178f2 100644
    "codexAuth.importMissingTokens": "Missing access_token or refresh_token in JSON",
    "codexAuth.importMissingId": "Account ID is required",
 diff --git a/gui/src/i18n/fr.ts b/gui/src/i18n/fr.ts
-index 5055c6b..e505ab6 100644
+index 5055c6b..860f88c 100644
 --- a/gui/src/i18n/fr.ts
 +++ b/gui/src/i18n/fr.ts
-@@ -1757,6 +1757,14 @@ export const fr: Record<TKey, string> = {
+@@ -1757,6 +1757,15 @@ export const fr: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "Contenu de auth.json",
    "codexAuth.addHelp": "Copiez-le depuis le fichier ~/.codex/auth.json d’une autre machine ou utilisez codex-auth export.",
    "codexAuth.importBtn": "Importer",
-+  "codexAuth.importFormatUpload": "Téléverser le format {format}",
++  "codexAuth.importFormatUpload": "Importer le jeton {format}",
++  "codexAuth.importFormatCredentialPrompt": "Téléverser ou coller les identifiants {format}",
 +  "codexAuth.importFormatImport": "Importer le format {format}",
 +  "codexAuth.importFormatPrompt": "Choisissez un fichier ou collez du JSON.",
 +  "codexAuth.importChangeFormat": "Changer de format",
@@ -287,14 +290,15 @@ index 5055c6b..e505ab6 100644
    "codexAuth.importMissingTokens": "access_token ou refresh_token absent du JSON",
    "codexAuth.importMissingId": "L’identifiant du compte est requis",
 diff --git a/gui/src/i18n/ja.ts b/gui/src/i18n/ja.ts
-index 69920a3..20dc5b4 100644
+index 69920a3..0ebccab 100644
 --- a/gui/src/i18n/ja.ts
 +++ b/gui/src/i18n/ja.ts
-@@ -1721,6 +1721,14 @@ export const ja: Record<TKey, string> = {
+@@ -1721,6 +1721,15 @@ export const ja: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json の内容",
    "codexAuth.addHelp": "別のマシンの ~/.codex/auth.json からコピー、または codex-auth export を使用。",
    "codexAuth.importBtn": "インポート",
-+  "codexAuth.importFormatUpload": "{format}形式をアップロード",
++  "codexAuth.importFormatUpload": "{format}トークンをインポート",
++  "codexAuth.importFormatCredentialPrompt": "{format}認証情報をアップロードまたは貼り付け",
 +  "codexAuth.importFormatImport": "{format}形式をインポート",
 +  "codexAuth.importFormatPrompt": "ファイルのアップロードまたはJSONの貼り付けを選択してください。",
 +  "codexAuth.importChangeFormat": "形式を変更",
@@ -306,14 +310,15 @@ index 69920a3..20dc5b4 100644
    "codexAuth.importMissingTokens": "JSON に access_token または refresh_token がありません",
    "codexAuth.importMissingId": "アカウント ID は必須です",
 diff --git a/gui/src/i18n/ko.ts b/gui/src/i18n/ko.ts
-index b2d7847..d111047 100644
+index b2d7847..7807a10 100644
 --- a/gui/src/i18n/ko.ts
 +++ b/gui/src/i18n/ko.ts
-@@ -1315,6 +1315,14 @@ export const ko: Record<TKey, string> = {
+@@ -1315,6 +1315,15 @@ export const ko: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json 내용",
    "codexAuth.addHelp": "다른 머신의 ~/.codex/auth.json을 복사하거나, codex-auth export를 사용하세요.",
    "codexAuth.importBtn": "가져오기",
-+  "codexAuth.importFormatUpload": "{format} 형식으로 업로드",
++  "codexAuth.importFormatUpload": "{format} 토큰 가져오기",
++  "codexAuth.importFormatCredentialPrompt": "{format} 자격 증명 업로드 또는 붙여넣기",
 +  "codexAuth.importFormatImport": "{format} 형식으로 가져오기",
 +  "codexAuth.importFormatPrompt": "파일 업로드 또는 JSON 붙여넣기를 선택하세요.",
 +  "codexAuth.importChangeFormat": "형식 변경",
@@ -325,14 +330,15 @@ index b2d7847..d111047 100644
    "codexAuth.importMissingTokens": "JSON에 access_token 또는 refresh_token이 없습니다",
    "codexAuth.importMissingId": "계정 ID를 입력하세요",
 diff --git a/gui/src/i18n/ru.ts b/gui/src/i18n/ru.ts
-index 72e743a..f4c620b 100644
+index 72e743a..ee5f1bb 100644
 --- a/gui/src/i18n/ru.ts
 +++ b/gui/src/i18n/ru.ts
-@@ -1772,6 +1772,14 @@ export const ru: Record<TKey, string> = {
+@@ -1772,6 +1772,15 @@ export const ru: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "Содержимое auth.json",
    "codexAuth.addHelp": "Скопируйте из ~/.codex/auth.json на другой машине или используйте codex-auth export.",
    "codexAuth.importBtn": "Импортировать",
-+  "codexAuth.importFormatUpload": "Загрузить формат {format}",
++  "codexAuth.importFormatUpload": "Импортировать токен {format}",
++  "codexAuth.importFormatCredentialPrompt": "Загрузите или вставьте учётные данные {format}",
 +  "codexAuth.importFormatImport": "Импортировать формат {format}",
 +  "codexAuth.importFormatPrompt": "Выберите загрузку файла или вставку JSON.",
 +  "codexAuth.importChangeFormat": "Изменить формат",
@@ -344,14 +350,15 @@ index 72e743a..f4c620b 100644
    "codexAuth.importMissingTokens": "В JSON отсутствует access_token или refresh_token",
    "codexAuth.importMissingId": "Укажите ID аккаунта",
 diff --git a/gui/src/i18n/tr.ts b/gui/src/i18n/tr.ts
-index 4239246..d340811 100644
+index 4239246..3ed7732 100644
 --- a/gui/src/i18n/tr.ts
 +++ b/gui/src/i18n/tr.ts
-@@ -1780,6 +1780,14 @@ export const tr: Record<TKey, string> = {
+@@ -1780,6 +1780,15 @@ export const tr: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json içeriği",
    "codexAuth.addHelp": "Başka bir makineden kopyalayın.",
    "codexAuth.importBtn": "İçe Aktar",
-+  "codexAuth.importFormatUpload": "{format} biçimini yükle",
++  "codexAuth.importFormatUpload": "{format} Tokenını İçe Aktar",
++  "codexAuth.importFormatCredentialPrompt": "{format} kimlik bilgilerini yükleyin veya yapıştırın",
 +  "codexAuth.importFormatImport": "{format} biçimini içe aktar",
 +  "codexAuth.importFormatPrompt": "Dosya yükleme veya JSON yapıştırma seçin.",
 +  "codexAuth.importChangeFormat": "Biçimi değiştir",
@@ -363,14 +370,15 @@ index 4239246..d340811 100644
    "codexAuth.importMissingTokens": "Eksik jetonlar",
    "codexAuth.importMissingId": "Hesap ID gereklidir",
 diff --git a/gui/src/i18n/zh-TW.ts b/gui/src/i18n/zh-TW.ts
-index 5c74b86..4ec4ae5 100644
+index 5c74b86..252fd73 100644
 --- a/gui/src/i18n/zh-TW.ts
 +++ b/gui/src/i18n/zh-TW.ts
-@@ -1371,6 +1371,14 @@ export const zhTW: Record<TKey, string> = {
+@@ -1371,6 +1371,15 @@ export const zhTW: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json 內容",
    "codexAuth.addHelp": "從另一臺機器的 ~/.codex/auth.json 複製，或使用 codex-auth export。",
    "codexAuth.importBtn": "匯入",
-+  "codexAuth.importFormatUpload": "上傳 {format} 格式",
++  "codexAuth.importFormatUpload": "匯入 {format} 權杖",
++  "codexAuth.importFormatCredentialPrompt": "上傳或貼上 {format} 憑證",
 +  "codexAuth.importFormatImport": "匯入 {format} 格式",
 +  "codexAuth.importFormatPrompt": "請選擇上傳檔案或貼上 JSON。",
 +  "codexAuth.importChangeFormat": "變更格式",
@@ -382,14 +390,15 @@ index 5c74b86..4ec4ae5 100644
    "codexAuth.importMissingTokens": "JSON 中缺少 access_token 或 refresh_token",
    "codexAuth.importMissingId": "請輸入帳號 ID",
 diff --git a/gui/src/i18n/zh.ts b/gui/src/i18n/zh.ts
-index 87001cb..0eeba5e 100644
+index 87001cb..7cb964e 100644
 --- a/gui/src/i18n/zh.ts
 +++ b/gui/src/i18n/zh.ts
-@@ -1308,6 +1308,14 @@ export const zh: Record<TKey, string> = {
+@@ -1308,6 +1308,15 @@ export const zh: Record<TKey, string> = {
    "codexAuth.addJsonLabel": "auth.json 内容",
    "codexAuth.addHelp": "从另一台机器的 ~/.codex/auth.json 复制，或使用 codex-auth export。",
    "codexAuth.importBtn": "导入",
-+  "codexAuth.importFormatUpload": "上传 {format} 格式",
++  "codexAuth.importFormatUpload": "导入 {format} 令牌",
++  "codexAuth.importFormatCredentialPrompt": "上传或粘贴 {format} 凭据",
 +  "codexAuth.importFormatImport": "导入 {format} 格式",
 +  "codexAuth.importFormatPrompt": "请选择上传文件或粘贴 JSON。",
 +  "codexAuth.importChangeFormat": "更改格式",
