@@ -15,6 +15,9 @@ The patched **Add Codex Account** dialog supports these formats:
 Choose a format, then either upload a JSON file or paste its contents. Pasted
 JSON is checked in the browser before it can be submitted. The proxy performs
 the final credential validation without returning token contents to the UI.
+<img width="601" height="611" alt="image" src="https://github.com/user-attachments/assets/073ed403-1ed9-411d-9f43-f0c5352c8d46" />
+<img width="633" height="460" alt="image" src="https://github.com/user-attachments/assets/dc635b64-45ec-4ba4-84de-30675996272d" />
+<img width="568" height="583" alt="image" src="https://github.com/user-attachments/assets/8c7bf4b5-7ccb-4a90-8744-0dbd74e01660" />
 
 ## Apply
 
