@@ -1,0 +1,644 @@
+diff --git a/gui/src/components/AddCodexAccountModal.tsx b/gui/src/components/AddCodexAccountModal.tsx
+index 1c86d91..8d065a6 100644
+--- a/gui/src/components/AddCodexAccountModal.tsx
++++ b/gui/src/components/AddCodexAccountModal.tsx
+@@ -1,5 +1,5 @@
+-import { useCallback, useEffect, useReducer, useRef } from "react";
+-import { useT } from "../i18n/shared";
++import { useCallback, useEffect, useReducer, useRef, useState } from "react";
++import { useT, type TKey } from "../i18n/shared";
+ import {
+   addCodexAccountUiReducer,
+   initialAddCodexAccountUiState,
+@@ -8,6 +8,38 @@ import { AddCodexAccountPickStep } from "./add-codex-account-pick-step";
+ import { AddCodexAccountWaitingStep } from "./add-codex-account-waiting-step";
+ import { useAddCodexAccountOAuth } from "./use-add-codex-account-oauth";
+ import type { CodexAccountMutationCompletion } from "../codex-account-mutation";
++import { codexAccountMutationCompletion } from "../codex-account-mutation";
++
++type TokenImportFormat = "sub2api" | "cpa" | "codex";
++
++function record(value: unknown): Record<string, unknown> | null {
++  return value !== null && typeof value === "object" && !Array.isArray(value)
++    ? value as Record<string, unknown>
++    : null;
++}
++
++/** Validate the selected public JSON shape locally; token validity remains server-side. */
++function tokenFileValidationError(document: unknown, format: TokenImportFormat): TKey | null {
++  const root = record(document);
++  if (!root) return "codexAuth.importInvalidJson";
++  const row = format === "sub2api"
++    ? (Array.isArray(root.accounts) ? root.accounts.find(value => record(value)?.platform === "openai" || record(value)?.type === "codex") : null)
++    : root;
++  const account = record(row);
++  if (!account) return "codexAuth.importInvalidJson";
++  if (format === "cpa" && account.type !== "codex") return "codexAuth.importInvalidJson";
++  if (format === "codex" && account.auth_mode !== "chatgpt") return "codexAuth.importInvalidJson";
++  const credentials = record(account.credentials) ?? record(account.tokens) ?? account;
++  if (typeof credentials.access_token !== "string" || !credentials.access_token.trim()) return "codexAuth.importMissingTokens";
++  if (format === "codex" && typeof credentials.id_token !== "string") return "codexAuth.importMissingTokens";
++  return null;
++}
++
++function pastedTokenFileValidationError(text: string, format: TokenImportFormat | null): TKey | null {
++  if (!format || !text.trim()) return null;
++  try { return tokenFileValidationError(JSON.parse(text) as unknown, format); }
++  catch { return "codexAuth.importInvalidJson"; }
++}
+ 
+ export default function AddCodexAccountModal({
+   apiBase, onClose, onAdded, reauthAccountId,
+@@ -19,6 +51,10 @@ export default function AddCodexAccountModal({
+ }) {
+   const t = useT();
+   const [ui, dispatch] = useReducer(addCodexAccountUiReducer, reauthAccountId, initialAddCodexAccountUiState);
++  const [importBusy, setImportBusy] = useState(false);
++  const [importText, setImportText] = useState("");
++  const [importFormat, setImportFormat] = useState<TokenImportFormat | null>(null);
++  const importValidationError = pastedTokenFileValidationError(importText, importFormat);
+   const previousFocusRef = useRef<HTMLElement | null>(null);
+   const dialogRef = useRef<HTMLDialogElement>(null);
+ 
+@@ -48,6 +84,29 @@ export default function AddCodexAccountModal({
+   }, [closeModal]);
+ 
+   const dialogLabel = reauthAccountId ? t("codexAuth.reauthenticate") : t("codexAuth.addTitle");
++  const importDocument = useCallback(async (text: string, format: TokenImportFormat) => {
++    setImportBusy(true);
++    dispatch({ type: "set-error", error: "" });
++    try {
++      const document = JSON.parse(text) as unknown;
++      const validationError = tokenFileValidationError(document, format);
++      if (validationError) throw new Error(t(validationError));
++      const response = await fetch(`${apiBase}/api/codex-auth/accounts/import`, {
++        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ format, document }),
++      });
++      const data = await response.json() as { error?: string; importedCount?: number; updatedCount?: number };
++      if (!response.ok) throw new Error(data.error ?? t("modal.networkError"));
++      if (!data.importedCount && !data.updatedCount) throw new Error(t("codexAuth.importNoAccounts"));
++      onAdded(codexAccountMutationCompletion(data));
++      setImportText("");
++      setImportFormat(null);
++    } catch (error) {
++      dispatch({ type: "set-error", error: error instanceof SyntaxError ? t("codexAuth.importInvalidJson") : error instanceof Error ? error.message : t("modal.networkError") });
++    } finally { setImportBusy(false); }
++  }, [apiBase, onAdded, t]);
++  const importFile = useCallback(async (format: TokenImportFormat, file: File) => {
++    await importDocument(await file.text(), format);
++  }, [importDocument]);
+ 
+   return (
+     <dialog
+@@ -63,6 +122,14 @@ export default function AddCodexAccountModal({
+             error={ui.error}
+             onIdChange={value => dispatch({ type: "set-id", id: value })}
+             onStartOAuth={() => { void startOAuth(ui.id); }}
++            importFormat={importFormat}
++            onImportFormatChange={setImportFormat}
++            onImportFile={(format, file) => { void importFile(format, file); }}
++            importText={importText}
++            onImportTextChange={setImportText}
++            onImportText={() => { if (importFormat) void importDocument(importText, importFormat); }}
++            importValidationError={importValidationError}
++            importBusy={importBusy}
+             onClose={closeModal}
+           />
+         )}
+diff --git a/gui/src/components/add-codex-account-pick-step.tsx b/gui/src/components/add-codex-account-pick-step.tsx
+index a205017..d26ce1b 100644
+--- a/gui/src/components/add-codex-account-pick-step.tsx
++++ b/gui/src/components/add-codex-account-pick-step.tsx
+@@ -1,20 +1,38 @@
++import { useState } from "react";
+ import { IconGlobe } from "../icons";
+-import { useT } from "../i18n/shared";
++import { useT, type TKey } from "../i18n/shared";
+ 
+ export function AddCodexAccountPickStep({
+   id,
+   error,
+   onIdChange,
+   onStartOAuth,
++  importFormat,
++  onImportFormatChange,
++  onImportFile,
++  importText,
++  onImportTextChange,
++  onImportText,
++  importValidationError,
++  importBusy,
+   onClose,
+ }: {
+   id: string;
+   error: string;
+   onIdChange: (value: string) => void;
+   onStartOAuth: () => void;
++  importFormat: "sub2api" | "cpa" | "codex" | null;
++  onImportFormatChange: (format: "sub2api" | "cpa" | "codex" | null) => void;
++  onImportFile: (format: "sub2api" | "cpa" | "codex", file: File) => void;
++  importText: string;
++  onImportTextChange: (value: string) => void;
++  onImportText: () => void;
++  importValidationError: TKey | null;
++  importBusy: boolean;
+   onClose: () => void;
+ }) {
+   const t = useT();
++  const [importMethod, setImportMethod] = useState<"file" | "paste" | null>(null);
+ 
+   return (
+     <>
+@@ -31,7 +49,7 @@ export function AddCodexAccountPickStep({
+         style={{ marginBottom: 12 }}
+       />
+ 
+-      <button type="button" className="list-row" onClick={onStartOAuth} style={{ marginBottom: 8 }}>
++      {!importFormat && <button type="button" className="list-row" onClick={onStartOAuth} style={{ marginBottom: 8 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+           <IconGlobe width={20} />
+           <div>
+@@ -40,6 +58,70 @@ export function AddCodexAccountPickStep({
+           </div>
+         </div>
+       </button>
++      }
++
++      {!importFormat && ([
++        "sub2api" as const, "cpa" as const, "codex" as const,
++      ]).map(format => (
++        <button key={format} type="button" className="list-row" onClick={() => { setImportMethod(null); onImportFormatChange(format); }} style={{ marginBottom: 8 }}>
++          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
++            <IconGlobe width={20} />
++            <div>
++              <div className="title">{t("codexAuth.importFormatUpload", { format })}</div>
++              <div className="sub">{t("codexAuth.importBtn")}</div>
++            </div>
++          </div>
++        </button>
++      ))}
++
++      {importFormat && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "4px 0 12px" }}>
++        <div>
++          <div className="field-label" style={{ margin: 0 }}>{t("codexAuth.importFormatImport", { format: importFormat })}</div>
++          <div className="sub">{t("codexAuth.importFormatPrompt")}</div>
++        </div>
++        <button type="button" onClick={() => { setImportMethod(null); onImportFormatChange(null); }} style={{ border: 0, background: "transparent", color: "var(--muted)", cursor: "pointer", font: "inherit", fontSize: "var(--text-label)", padding: 0 }}>{t("codexAuth.importChangeFormat")}</button>
++      </div>}
++
++      {importFormat && !importMethod && <>
++      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
++      <label className="btn btn-primary" style={{ flex: 1, justifyContent: "center", cursor: importBusy ? "wait" : "pointer", opacity: importBusy ? .65 : 1 }}>
++        <input
++          type="file"
++          accept="application/json,.json"
++          disabled={importBusy}
++          style={{ display: "none" }}
++          onChange={event => {
++            const file = event.currentTarget.files?.[0];
++            if (file) onImportFile(importFormat, file);
++            event.currentTarget.value = "";
++          }}
++        />
++        {t("codexAuth.importUploadFile")}
++      </label>
++      <button type="button" className="btn btn-ghost" onClick={() => setImportMethod("paste")} style={{ flex: 1, justifyContent: "center" }}>
++        {t("codexAuth.importPasteJson")}
++      </button>
++      </div>
++      </>}
++
++      {importFormat && importMethod === "paste" && <>
++      <button type="button" onClick={() => setImportMethod(null)} style={{ border: 0, background: "transparent", color: "var(--muted)", cursor: "pointer", font: "inherit", fontSize: "var(--text-label)", padding: 0, marginBottom: 8 }}>
++        {t("codexAuth.importChangeMethod")}
++      </button>
++      <label className="field-label" htmlFor="codex-token-import-text">{t("codexAuth.importFormatImport", { format: importFormat })}</label>
++      <textarea
++        id="codex-token-import-text"
++        className="input"
++        value={importText}
++        disabled={importBusy}
++        onChange={event => onImportTextChange(event.target.value)}
++        style={{ minHeight: 96, marginBottom: 8 }}
++      />
++      {importValidationError && <div className="notice notice-err" style={{ marginBottom: 8 }}>{t(importValidationError)}</div>}
++      <button type="button" className="btn btn-ghost" disabled={importBusy || !importText.trim() || !!importValidationError} onClick={onImportText} style={{ width: "100%", marginBottom: 8 }}>
++        {t("codexAuth.importBtn")}
++      </button>
++      </>}
+ 
+       {error && <div className="notice notice-err" style={{ marginTop: 8 }}>{error}</div>}
+ 
+diff --git a/gui/src/i18n/de.ts b/gui/src/i18n/de.ts
+index 36d058a..fab74c5 100644
+--- a/gui/src/i18n/de.ts
++++ b/gui/src/i18n/de.ts
+@@ -1291,6 +1291,14 @@ export const de: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json-Inhalt",
+   "codexAuth.addHelp": "Kopiere von ~/.codex/auth.json einer anderen Maschine oder nutze codex-auth export.",
+   "codexAuth.importBtn": "Importieren",
++  "codexAuth.importFormatUpload": "{format}-Format hochladen",
++  "codexAuth.importFormatImport": "{format}-Format importieren",
++  "codexAuth.importFormatPrompt": "Datei-Upload oder JSON-Einfügen auswählen.",
++  "codexAuth.importChangeFormat": "Format ändern",
++  "codexAuth.importUploadFile": "Datei hochladen",
++  "codexAuth.importPasteJson": "JSON einfügen",
++  "codexAuth.importChangeMethod": "Importmethode ändern",
++  "codexAuth.importNoAccounts": "Keine importierbaren Konten gefunden.",
+   "codexAuth.importInvalidJson": "Ungültiges JSON",
+   "codexAuth.importMissingTokens": "access_token oder refresh_token fehlen in JSON",
+   "codexAuth.importMissingId": "Konto-ID ist erforderlich",
+diff --git a/gui/src/i18n/en.ts b/gui/src/i18n/en.ts
+index 703fa71..f2178f2 100644
+--- a/gui/src/i18n/en.ts
++++ b/gui/src/i18n/en.ts
+@@ -1794,6 +1794,14 @@ export const en = {
+   "codexAuth.addJsonLabel": "auth.json content",
+   "codexAuth.addHelp": "Copy from another machine's ~/.codex/auth.json, or use codex-auth export.",
+   "codexAuth.importBtn": "Import",
++  "codexAuth.importFormatUpload": "Upload {format} format",
++  "codexAuth.importFormatImport": "Import {format} format",
++  "codexAuth.importFormatPrompt": "Choose a file upload or JSON paste.",
++  "codexAuth.importChangeFormat": "Change format",
++  "codexAuth.importUploadFile": "Upload file",
++  "codexAuth.importPasteJson": "Paste JSON",
++  "codexAuth.importChangeMethod": "Change import method",
++  "codexAuth.importNoAccounts": "No importable accounts were found.",
+   "codexAuth.importInvalidJson": "Invalid JSON",
+   "codexAuth.importMissingTokens": "Missing access_token or refresh_token in JSON",
+   "codexAuth.importMissingId": "Account ID is required",
+diff --git a/gui/src/i18n/fr.ts b/gui/src/i18n/fr.ts
+index 5055c6b..e505ab6 100644
+--- a/gui/src/i18n/fr.ts
++++ b/gui/src/i18n/fr.ts
+@@ -1757,6 +1757,14 @@ export const fr: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "Contenu de auth.json",
+   "codexAuth.addHelp": "Copiez-le depuis le fichier ~/.codex/auth.json d’une autre machine ou utilisez codex-auth export.",
+   "codexAuth.importBtn": "Importer",
++  "codexAuth.importFormatUpload": "Téléverser le format {format}",
++  "codexAuth.importFormatImport": "Importer le format {format}",
++  "codexAuth.importFormatPrompt": "Choisissez un fichier ou collez du JSON.",
++  "codexAuth.importChangeFormat": "Changer de format",
++  "codexAuth.importUploadFile": "Téléverser un fichier",
++  "codexAuth.importPasteJson": "Coller du JSON",
++  "codexAuth.importChangeMethod": "Changer de méthode",
++  "codexAuth.importNoAccounts": "Aucun compte importable trouvé.",
+   "codexAuth.importInvalidJson": "JSON non valide",
+   "codexAuth.importMissingTokens": "access_token ou refresh_token absent du JSON",
+   "codexAuth.importMissingId": "L’identifiant du compte est requis",
+diff --git a/gui/src/i18n/ja.ts b/gui/src/i18n/ja.ts
+index 69920a3..20dc5b4 100644
+--- a/gui/src/i18n/ja.ts
++++ b/gui/src/i18n/ja.ts
+@@ -1721,6 +1721,14 @@ export const ja: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json の内容",
+   "codexAuth.addHelp": "別のマシンの ~/.codex/auth.json からコピー、または codex-auth export を使用。",
+   "codexAuth.importBtn": "インポート",
++  "codexAuth.importFormatUpload": "{format}形式をアップロード",
++  "codexAuth.importFormatImport": "{format}形式をインポート",
++  "codexAuth.importFormatPrompt": "ファイルのアップロードまたはJSONの貼り付けを選択してください。",
++  "codexAuth.importChangeFormat": "形式を変更",
++  "codexAuth.importUploadFile": "ファイルをアップロード",
++  "codexAuth.importPasteJson": "JSONを貼り付け",
++  "codexAuth.importChangeMethod": "方法を変更",
++  "codexAuth.importNoAccounts": "インポート可能なアカウントがありません。",
+   "codexAuth.importInvalidJson": "無効な JSON です",
+   "codexAuth.importMissingTokens": "JSON に access_token または refresh_token がありません",
+   "codexAuth.importMissingId": "アカウント ID は必須です",
+diff --git a/gui/src/i18n/ko.ts b/gui/src/i18n/ko.ts
+index b2d7847..d111047 100644
+--- a/gui/src/i18n/ko.ts
++++ b/gui/src/i18n/ko.ts
+@@ -1315,6 +1315,14 @@ export const ko: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json 내용",
+   "codexAuth.addHelp": "다른 머신의 ~/.codex/auth.json을 복사하거나, codex-auth export를 사용하세요.",
+   "codexAuth.importBtn": "가져오기",
++  "codexAuth.importFormatUpload": "{format} 형식으로 업로드",
++  "codexAuth.importFormatImport": "{format} 형식으로 가져오기",
++  "codexAuth.importFormatPrompt": "파일 업로드 또는 JSON 붙여넣기를 선택하세요.",
++  "codexAuth.importChangeFormat": "형식 변경",
++  "codexAuth.importUploadFile": "파일 업로드",
++  "codexAuth.importPasteJson": "내용 붙여넣기",
++  "codexAuth.importChangeMethod": "업로드 방식 변경",
++  "codexAuth.importNoAccounts": "가져올 수 있는 계정이 없습니다.",
+   "codexAuth.importInvalidJson": "유효하지 않은 JSON",
+   "codexAuth.importMissingTokens": "JSON에 access_token 또는 refresh_token이 없습니다",
+   "codexAuth.importMissingId": "계정 ID를 입력하세요",
+diff --git a/gui/src/i18n/ru.ts b/gui/src/i18n/ru.ts
+index 72e743a..f4c620b 100644
+--- a/gui/src/i18n/ru.ts
++++ b/gui/src/i18n/ru.ts
+@@ -1772,6 +1772,14 @@ export const ru: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "Содержимое auth.json",
+   "codexAuth.addHelp": "Скопируйте из ~/.codex/auth.json на другой машине или используйте codex-auth export.",
+   "codexAuth.importBtn": "Импортировать",
++  "codexAuth.importFormatUpload": "Загрузить формат {format}",
++  "codexAuth.importFormatImport": "Импортировать формат {format}",
++  "codexAuth.importFormatPrompt": "Выберите загрузку файла или вставку JSON.",
++  "codexAuth.importChangeFormat": "Изменить формат",
++  "codexAuth.importUploadFile": "Загрузить файл",
++  "codexAuth.importPasteJson": "Вставить JSON",
++  "codexAuth.importChangeMethod": "Изменить способ импорта",
++  "codexAuth.importNoAccounts": "Нет аккаунтов для импорта.",
+   "codexAuth.importInvalidJson": "Некорректный JSON",
+   "codexAuth.importMissingTokens": "В JSON отсутствует access_token или refresh_token",
+   "codexAuth.importMissingId": "Укажите ID аккаунта",
+diff --git a/gui/src/i18n/tr.ts b/gui/src/i18n/tr.ts
+index 4239246..d340811 100644
+--- a/gui/src/i18n/tr.ts
++++ b/gui/src/i18n/tr.ts
+@@ -1780,6 +1780,14 @@ export const tr: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json içeriği",
+   "codexAuth.addHelp": "Başka bir makineden kopyalayın.",
+   "codexAuth.importBtn": "İçe Aktar",
++  "codexAuth.importFormatUpload": "{format} biçimini yükle",
++  "codexAuth.importFormatImport": "{format} biçimini içe aktar",
++  "codexAuth.importFormatPrompt": "Dosya yükleme veya JSON yapıştırma seçin.",
++  "codexAuth.importChangeFormat": "Biçimi değiştir",
++  "codexAuth.importUploadFile": "Dosya yükle",
++  "codexAuth.importPasteJson": "JSON yapıştır",
++  "codexAuth.importChangeMethod": "İçe aktarma yöntemini değiştir",
++  "codexAuth.importNoAccounts": "İçe aktarılabilir hesap bulunamadı.",
+   "codexAuth.importInvalidJson": "Geçersiz JSON",
+   "codexAuth.importMissingTokens": "Eksik jetonlar",
+   "codexAuth.importMissingId": "Hesap ID gereklidir",
+diff --git a/gui/src/i18n/zh-TW.ts b/gui/src/i18n/zh-TW.ts
+index 5c74b86..4ec4ae5 100644
+--- a/gui/src/i18n/zh-TW.ts
++++ b/gui/src/i18n/zh-TW.ts
+@@ -1371,6 +1371,14 @@ export const zhTW: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json 內容",
+   "codexAuth.addHelp": "從另一臺機器的 ~/.codex/auth.json 複製，或使用 codex-auth export。",
+   "codexAuth.importBtn": "匯入",
++  "codexAuth.importFormatUpload": "上傳 {format} 格式",
++  "codexAuth.importFormatImport": "匯入 {format} 格式",
++  "codexAuth.importFormatPrompt": "請選擇上傳檔案或貼上 JSON。",
++  "codexAuth.importChangeFormat": "變更格式",
++  "codexAuth.importUploadFile": "上傳檔案",
++  "codexAuth.importPasteJson": "貼上 JSON",
++  "codexAuth.importChangeMethod": "變更匯入方式",
++  "codexAuth.importNoAccounts": "找不到可匯入的帳號。",
+   "codexAuth.importInvalidJson": "無效的 JSON",
+   "codexAuth.importMissingTokens": "JSON 中缺少 access_token 或 refresh_token",
+   "codexAuth.importMissingId": "請輸入帳號 ID",
+diff --git a/gui/src/i18n/zh.ts b/gui/src/i18n/zh.ts
+index 87001cb..0eeba5e 100644
+--- a/gui/src/i18n/zh.ts
++++ b/gui/src/i18n/zh.ts
+@@ -1308,6 +1308,14 @@ export const zh: Record<TKey, string> = {
+   "codexAuth.addJsonLabel": "auth.json 内容",
+   "codexAuth.addHelp": "从另一台机器的 ~/.codex/auth.json 复制，或使用 codex-auth export。",
+   "codexAuth.importBtn": "导入",
++  "codexAuth.importFormatUpload": "上传 {format} 格式",
++  "codexAuth.importFormatImport": "导入 {format} 格式",
++  "codexAuth.importFormatPrompt": "请选择上传文件或粘贴 JSON。",
++  "codexAuth.importChangeFormat": "更改格式",
++  "codexAuth.importUploadFile": "上传文件",
++  "codexAuth.importPasteJson": "粘贴 JSON",
++  "codexAuth.importChangeMethod": "更改导入方式",
++  "codexAuth.importNoAccounts": "未找到可导入的账户。",
+   "codexAuth.importInvalidJson": "无效的 JSON",
+   "codexAuth.importMissingTokens": "JSON 中缺少 access_token 或 refresh_token",
+   "codexAuth.importMissingId": "请输入账号 ID",
+diff --git a/src/codex/auth-api.ts b/src/codex/auth-api.ts
+index c70ebf7..3a180c9 100644
+--- a/src/codex/auth-api.ts
++++ b/src/codex/auth-api.ts
+@@ -83,6 +83,9 @@ export {
+   updateAccountQuota,
+ } from "./quota";
+ import { extractAccountId } from "../oauth/chatgpt";
++import { refreshChatGPTToken } from "../oauth/chatgpt";
++import { parseCodexTokenImport } from "./account-import";
++import { readBoundedJsonRequestBody } from "../server/request-decompress";
+ import { getMainAccountPlan, isMainAccountTokenVerifiablyLive, MAIN_CODEX_ACCOUNT_ID, setMainAccountPlan } from "./main-account";
+ import { captureConfigGeneration, registerStateSweepAfterTick } from "../lib/state-store-sweeper";
+ import { reconcileLiveStateStores } from "../lib/state-store-registrations";
+@@ -1453,6 +1456,99 @@ export async function handleCodexAuthAPI(
+     return manualImportDisabledResponse();
+   }
+ 
++  // CPA stores one flat `{ type: "codex", ... }` credential while sub2api stores
++  // the same credential under each `accounts[].credentials` entry.  Keep this as a
++  // separate, upload-only route: callers never send an individual bearer/refresh pair
++  // to the historical manual-account endpoint.
++  if (url.pathname === "/api/codex-auth/accounts/import" && req.method === "POST") {
++    let body: { document?: unknown; format?: unknown };
++    try { body = await readBoundedJsonRequestBody(req, 257 * 1024) as typeof body; } catch {
++      return jsonResponse({ error: "Invalid or oversized JSON" }, 400);
++    }
++    if (body.format !== "sub2api" && body.format !== "cpa" && body.format !== "codex") {
++      return jsonResponse({ error: "Unsupported token-file format" }, 400);
++    }
++    const imported = parseCodexTokenImport(body.document, body.format);
++    if (imported.length === 0) {
++      return jsonResponse({ error: "No valid refreshable Codex accounts found in the selected JSON format" }, 400);
++    }
++    const runtimeConfig = getRuntimeConfig(config);
++    const results: Array<{ id: string; status: "imported" | "updated" | "failed"; code?: string }> = [];
++    let pickerVisibilityChanged = false;
++    for (const incoming of imported) {
++      let failureCode = "credential_rejected";
++      try {
++        // Refresh before persistence. This proves the uploaded refresh grant is usable,
++        // avoids saving an already-expired bearer, and prevents raw token data reaching logs.
++        let refreshed: Awaited<ReturnType<typeof refreshChatGPTToken>> | null = null;
++        if (incoming.credential.refreshToken) {
++          try {
++            refreshed = await refreshChatGPTToken(incoming.credential.refreshToken, { signal: req.signal });
++          } catch {
++            // A stale refresh grant must not discard an access token that can still
++            // pass the authenticated Codex warmup below.
++          }
++        }
++        const accountId = refreshed?.accountId ?? incoming.credential.chatgptAccountId;
++        const email = refreshed?.email ?? incoming.email;
++        if (!accountId || !email) throw new Error("missing identity");
++        const credential: CodexAccountCredentials = {
++          accessToken: refreshed?.access ?? incoming.credential.accessToken,
++          refreshToken: refreshed?.refresh || incoming.credential.refreshToken,
++          expiresAt: refreshed?.expires ?? incoming.credential.expiresAt,
++          chatgptAccountId: accountId,
++        };
++        const collision = checkAccountIdCollision(accountId, email, incoming.plan, incoming.id);
++        if (collision.collision) { failureCode = "duplicate_account"; throw new Error("duplicate identity"); }
++        const warmup = await verifyCodexAccountWarmup(incoming.id, credential.accessToken, accountId);
++        if (!warmup.ok) { failureCode = "access_token_rejected"; throw new Error("warmup failed"); }
++        const existing = (runtimeConfig.codexAccounts ?? []).find(account => account.id === incoming.id && !account.isMain);
++        if (existing) {
++          saveCodexAccountCredential(incoming.id, credential);
++          markCodexAccountValidated(incoming.id, warmup.validatedAt);
++          clearAccountNeedsReauth(incoming.id);
++          existing.email = email;
++          existing.plan = incoming.plan ?? existing.plan;
++          saveRuntimeConfig(config, runtimeConfig);
++          results.push({ id: incoming.id, status: "updated" });
++        } else {
++          const added = withCodexAccountLogLabel({
++            id: incoming.id, email, plan: incoming.plan, isMain: false,
++          }, runtimeConfig.codexAccounts ?? []);
++          const outcome = persistNewCodexAccount(config, runtimeConfig, added, {
++            credential, validatedAt: warmup.validatedAt,
++          });
++          if (outcome.status !== "committed") { failureCode = "persist_failed"; throw new Error("persistence failed"); }
++          pickerVisibilityChanged ||= outcome.pickerVisibilityChanged;
++          results.push({ id: incoming.id, status: "imported" });
++        }
++      } catch {
++        results.push({ id: incoming.id, status: "failed", code: failureCode });
++      }
++    }
++    reconcileLiveStateStores();
++    const catalogRefresh = await convergeAccountNamespaceCatalog(runtimeConfig, pickerVisibilityChanged, convergeCodexCatalog);
++    const result = {
++      results,
++      importedCount: results.filter(result => result.status === "imported").length,
++      updatedCount: results.filter(result => result.status === "updated").length,
++      failedCount: results.filter(result => result.status === "failed").length,
++      ...catalogRefresh,
++    };
++    if (result.importedCount === 0 && result.updatedCount === 0) {
++      const firstCode = result.results.find(item => item.status === "failed")?.code;
++      const error = firstCode === "duplicate_account"
++        ? "This ChatGPT account is already in the pool."
++        : firstCode === "access_token_rejected"
++          ? "OpenAI rejected this access token for Codex. Sign in again or export a newer token file."
++          : firstCode === "credential_rejected"
++            ? "OpenAI could not refresh these credentials. Export a newer token file or sign in again."
++            : "The uploaded credentials could not be saved. Try again.";
++      return jsonResponse({ ...result, error }, 400);
++    }
++    return jsonResponse(result);
++  }
++
+   if (url.pathname === "/api/codex-auth/accounts" && req.method === "DELETE") {
+     const id = url.searchParams.get("id");
+     if (!id) return jsonResponse({ error: "Missing id" }, 400);
+diff --git a/src/server/management/route-registry.ts b/src/server/management/route-registry.ts
+index 3ebce88..6180643 100644
+--- a/src/server/management/route-registry.ts
++++ b/src/server/management/route-registry.ts
+@@ -90,6 +90,7 @@ export const MANAGEMENT_ROUTES: readonly ManagementRoute[] = [
+   { method: "GET", path: "/api/codex-auth/reset-credits", module: "codex/auth-api", mutates: false },
+   { method: "PATCH", path: "/api/codex-auth/pool-strategy", module: "codex/auth-api", mutates: true },
+   { method: "POST", path: "/api/codex-auth/accounts", module: "codex/auth-api", mutates: true },
++  { method: "POST", path: "/api/codex-auth/accounts/import", module: "codex/auth-api", mutates: true, exempt: { reason: "session-only", why: "Reads a user-selected local token file in the dashboard." } },
+   { method: "POST", path: "/api/codex-auth/accounts/clear-cooldown", module: "codex/auth-api", mutates: true },
+   { method: "POST", path: "/api/codex-auth/login", module: "codex/auth-api", mutates: true },
+   { method: "POST", path: "/api/codex-auth/login/cancel", module: "codex/auth-api", mutates: true },
+diff --git a/src/codex/account-import.ts b/src/codex/account-import.ts
+new file mode 100644
+index 0000000..77a3c2c
+--- /dev/null
++++ b/src/codex/account-import.ts
+@@ -0,0 +1,110 @@
++import { createHash } from "node:crypto";
++import { extractAccountId, extractEmail, decodeJwtPayload } from "../oauth/chatgpt";
++import { extractChatgptPlanType } from "./plan";
++import { isValidCodexAccountId } from "./account-id";
++import type { CodexAccountCredentials } from "../types";
++
++/** Maximum number of credentials accepted from one local JSON upload. */
++export const CODEX_TOKEN_IMPORT_MAX_RECORDS = 25;
++const TOKEN_MAX_BYTES = 16 * 1024;
++export type CodexTokenImportFormat = "sub2api" | "cpa" | "codex";
++
++export interface ImportedCodexAccount {
++  id: string;
++  email: string;
++  plan?: string;
++  credential: CodexAccountCredentials;
++}
++
++function object(value: unknown): Record<string, unknown> | null {
++  return value !== null && typeof value === "object" && !Array.isArray(value)
++    ? value as Record<string, unknown>
++    : null;
++}
++
++function text(value: unknown): string | undefined {
++  return typeof value === "string" && value.trim() ? value.trim() : undefined;
++}
++
++function token(value: unknown): string | undefined {
++  const result = text(value);
++  return result && Buffer.byteLength(result, "utf8") <= TOKEN_MAX_BYTES ? result : undefined;
++}
++
++function expiresAt(value: unknown, accessToken: string): number {
++  if (typeof value === "number" && Number.isFinite(value)) {
++    return value > 1e11 ? value : value * 1000;
++  }
++  if (typeof value === "string") {
++    const numeric = Number(value);
++    if (Number.isFinite(numeric) && value.trim()) return numeric > 1e11 ? numeric : numeric * 1000;
++    const parsed = Date.parse(value);
++    if (Number.isFinite(parsed)) return parsed;
++  }
++  const exp = decodeJwtPayload(accessToken)?.exp;
++  if (typeof exp === "number" && Number.isFinite(exp)) return exp * 1000;
++  // Opaque access tokens have no readable expiry. Warmup validates them upstream;
++  // retain them briefly so an accepted access-only export can serve immediately.
++  return Date.now() + 15 * 60_000;
++}
++
++function poolId(chatgptAccountId: string, email: string): string {
++  const candidate = chatgptAccountId.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 64);
++  if (isValidCodexAccountId(candidate)) return candidate;
++  const digest = createHash("sha256").update(`${chatgptAccountId}\0${email}`).digest("hex").slice(0, 16);
++  return `import-${digest}`;
++}
++
++function parseRecord(raw: unknown, format: CodexTokenImportFormat): ImportedCodexAccount | null {
++  const row = object(raw);
++  if (!row) return null;
++  if (format === "sub2api" && !object(row.credentials)) return null;
++  if (format === "cpa" && text(row.type)?.toLowerCase() !== "codex") return null;
++  if (format === "codex" && text(row.auth_mode)?.toLowerCase() !== "chatgpt") return null;
++  const credentials = object(row.credentials) ?? object(row.tokens) ?? row;
++  const extra = object(row.extra) ?? {};
++  const platform = text(row.platform) ?? text(row.type);
++  if (format === "sub2api" && platform && !["openai", "codex"].includes(platform.toLowerCase())) return null;
++
++  const accessToken = token(credentials.access_token ?? credentials.accessToken);
++  const refreshToken = token(credentials.refresh_token ?? credentials.refreshToken) ?? "";
++  const idToken = token(credentials.id_token ?? credentials.idToken);
++  if (!accessToken) return null;
++  const chatgptAccountId = text(credentials.chatgpt_account_id)
++    ?? text(credentials.account_id)
++    ?? extractAccountId(idToken, accessToken);
++  if (!chatgptAccountId || Buffer.byteLength(chatgptAccountId, "utf8") > 256) return null;
++  const email = (text(credentials.email) ?? text(extra.email) ?? extractEmail(idToken, accessToken) ?? "").toLowerCase();
++  if (!email || email.length > 254) return null;
++  const plan = text(credentials.plan_type) ?? text(row.plan_type) ?? extractChatgptPlanType(idToken, accessToken);
++  return {
++    id: poolId(chatgptAccountId, email),
++    email,
++    plan,
++    credential: {
++      accessToken,
++      refreshToken,
++      expiresAt: expiresAt(credentials.expires_at ?? credentials.expired ?? row.expired, accessToken),
++      chatgptAccountId,
++    },
++  };
++}
++
++/** Parse a CPA file or sub2api's `{ accounts: [...] }` export without retaining its raw document. */
++export function parseCodexTokenImport(document: unknown, format: CodexTokenImportFormat): ImportedCodexAccount[] {
++  const root = object(document);
++  if (!root) return [];
++  if (format === "sub2api" && !Array.isArray(root.accounts)) return [];
++  if (format !== "sub2api" && Array.isArray(root.accounts)) return [];
++  const rows = Array.isArray(root.accounts) ? root.accounts : [root];
++  if (rows.length > CODEX_TOKEN_IMPORT_MAX_RECORDS) return [];
++  const seen = new Set<string>();
++  const accounts: ImportedCodexAccount[] = [];
++  for (const row of rows) {
++    const account = parseRecord(row, format);
++    if (!account || seen.has(account.credential.chatgptAccountId)) continue;
++    seen.add(account.credential.chatgptAccountId);
++    accounts.push(account);
++  }
++  return accounts;
++}
