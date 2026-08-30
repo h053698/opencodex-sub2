@@ -106,14 +106,18 @@ index 1c86d91..8d065a6 100644
            />
          )}
 diff --git a/gui/src/components/add-codex-account-pick-step.tsx b/gui/src/components/add-codex-account-pick-step.tsx
-index a205017..999d9eb 100644
+index a205017..8880610 100644
 --- a/gui/src/components/add-codex-account-pick-step.tsx
 +++ b/gui/src/components/add-codex-account-pick-step.tsx
-@@ -1,20 +1,38 @@
+@@ -1,20 +1,42 @@
 +import { useState } from "react";
  import { IconGlobe } from "../icons";
 -import { useT } from "../i18n/shared";
 +import { useT, type TKey } from "../i18n/shared";
++
++const formatDisplayName = (format: "sub2api" | "cpa" | "codex") => (
++  format === "sub2api" ? "Sub2API" : format === "cpa" ? "CPA" : "Codex"
++);
  
  export function AddCodexAccountPickStep({
    id,
@@ -149,7 +153,7 @@ index a205017..999d9eb 100644
  
    return (
      <>
-@@ -31,7 +49,7 @@ export function AddCodexAccountPickStep({
+@@ -31,7 +53,7 @@ export function AddCodexAccountPickStep({
          style={{ marginBottom: 12 }}
        />
  
@@ -158,7 +162,7 @@ index a205017..999d9eb 100644
          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
            <IconGlobe width={20} />
            <div>
-@@ -40,6 +58,70 @@ export function AddCodexAccountPickStep({
+@@ -40,6 +62,70 @@ export function AddCodexAccountPickStep({
            </div>
          </div>
        </button>
@@ -171,8 +175,8 @@ index a205017..999d9eb 100644
 +          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
 +            <IconGlobe width={20} />
 +            <div>
-+              <div className="title">{t("codexAuth.importFormatUpload", { format })}</div>
-+              <div className="sub">{t("codexAuth.importFormatCredentialPrompt", { format })}</div>
++              <div className="title">{t("codexAuth.importFormatUpload", { format: formatDisplayName(format) })}</div>
++              <div className="sub">{t("codexAuth.importFormatCredentialPrompt", { format: formatDisplayName(format) })}</div>
 +            </div>
 +          </div>
 +        </button>
@@ -180,7 +184,7 @@ index a205017..999d9eb 100644
 +
 +      {importFormat && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "4px 0 12px" }}>
 +        <div>
-+          <div className="field-label" style={{ margin: 0 }}>{t("codexAuth.importFormatImport", { format: importFormat })}</div>
++          <div className="field-label" style={{ margin: 0 }}>{t("codexAuth.importFormatImport", { format: formatDisplayName(importFormat) })}</div>
 +          <div className="sub">{t("codexAuth.importFormatPrompt")}</div>
 +        </div>
 +        <button type="button" onClick={() => { setImportMethod(null); onImportFormatChange(null); }} style={{ border: 0, background: "transparent", color: "var(--muted)", cursor: "pointer", font: "inherit", fontSize: "var(--text-label)", padding: 0 }}>{t("codexAuth.importChangeFormat")}</button>
@@ -212,7 +216,7 @@ index a205017..999d9eb 100644
 +      <button type="button" onClick={() => setImportMethod(null)} style={{ border: 0, background: "transparent", color: "var(--muted)", cursor: "pointer", font: "inherit", fontSize: "var(--text-label)", padding: 0, marginBottom: 8 }}>
 +        {t("codexAuth.importChangeMethod")}
 +      </button>
-+      <label className="field-label" htmlFor="codex-token-import-text">{t("codexAuth.importFormatImport", { format: importFormat })}</label>
++      <label className="field-label" htmlFor="codex-token-import-text">{t("codexAuth.importFormatImport", { format: formatDisplayName(importFormat) })}</label>
 +      <textarea
 +        id="codex-token-import-text"
 +        className="input"
