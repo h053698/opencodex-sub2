@@ -10,7 +10,8 @@
 - `CPA`
 - `Codex` / `auth.json`
 
-형식을 선택한 뒤 JSON 파일을 업로드하거나 내용을 붙여넣을 수 있습니다. 붙여넣은 JSON은 브라우저에서 먼저 구조를 검사하며, 프록시는 토큰 원문을 UI에 반환하지 않고 최종 자격 증명 검증을 수행합니다.
+형식을 선택한 뒤 JSON 파일을 업로드하거나 내용을 붙여넣을 수 있습니다. 붙여넣은 JSON은 브라우저에서 먼저 구조를 검사하며, 프록시는 토큰 원문을 UI에 반환하지 않고 최종 자격 증명 검증을 수행합니다.  
+  
 <img width="618" height="606" alt="image" src="https://github.com/user-attachments/assets/65728b4f-f3d3-4293-8472-8ab341ed979a" />
 <img width="651" height="422" alt="image" src="https://github.com/user-attachments/assets/adb57fc1-bd09-484e-b9de-1d00cd0f7a72" />
 <img width="585" height="575" alt="image" src="https://github.com/user-attachments/assets/93513906-383b-4489-be1d-3cdfac5449d7" />
