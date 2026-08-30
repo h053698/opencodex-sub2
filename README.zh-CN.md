@@ -11,6 +11,9 @@
 - `Codex` / `auth.json`
 
 选择格式后，可以上传 JSON 文件或粘贴其内容。粘贴的 JSON 会先在浏览器中检查结构；代理会进行最终凭据验证，且不会将令牌内容返回到 UI。
+<img width="531" height="584" alt="image" src="https://github.com/user-attachments/assets/91b1d172-9776-460b-bcac-f973c1e63f59" />
+<img width="674" height="451" alt="image" src="https://github.com/user-attachments/assets/aef82cef-52ce-4cad-9ab2-29e5090c9ca1" />
+<img width="604" height="584" alt="image" src="https://github.com/user-attachments/assets/fb5aaf0c-df13-42e3-a697-8826cc49851e" />
 
 ## 应用补丁
 
