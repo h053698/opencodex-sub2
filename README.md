@@ -21,7 +21,7 @@ the final credential validation without returning token contents to the UI.
 Requires Bun, Git, and an existing OpenCodex installation.
 
 ```bash
-bun scripts/apply-cpa-sub2-import.ts
+bun scripts/patch.ts
 ```
 
 The launcher first looks for an OpenCodex source checkout. If none is found, it
@@ -34,16 +34,16 @@ Options:
 
 ```bash
 # Patch only a source checkout.
-bun scripts/apply-cpa-sub2-import.ts --target=source /path/to/opencodex
+bun scripts/patch.ts --target=source /path/to/opencodex
 
 # Force the global Bun-installation workflow.
-bun scripts/apply-cpa-sub2-import.ts --target=global
+bun scripts/patch.ts --target=global
 
 # Apply and build, but leave restarting OpenCodex to you.
-bun scripts/apply-cpa-sub2-import.ts --no-restart
+bun scripts/patch.ts --no-restart
 
 # Show the detected target without changing anything.
-bun scripts/apply-cpa-sub2-import.ts --print-source
+bun scripts/patch.ts --print-source
 ```
 
 Set `OPENCODEX_SOURCE_DIR` when source discovery needs a fixed checkout path.
@@ -61,4 +61,4 @@ Set `OPENCODEX_SOURCE_DIR` when source discovery needs a fixed checkout path.
 ## Contents
 
 - `patches/cpa-sub2-token-import.patch` — patch applied to an OpenCodex source checkout.
-- `scripts/apply-cpa-sub2-import.ts` — target discovery, patch, build, and restart launcher.
+- `scripts/patch.ts` — target discovery, patch, build, and restart launcher.

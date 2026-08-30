@@ -17,7 +17,7 @@
 Bun, Git, 그리고 기존 OpenCodex 설치가 필요합니다.
 
 ```bash
-bun scripts/apply-cpa-sub2-import.ts
+bun scripts/patch.ts
 ```
 
 스크립트는 먼저 OpenCodex 소스 checkout을 찾습니다. 찾지 못하면 전역 Bun 설치를 감지하고 `~/.opencodex/patched-source/`에 패치용 소스 작업본을 만든 뒤 빌드합니다. 그 다음 전역 패키지 링크를 작업본으로 전환합니다. 기존 전역 패키지는 날짜가 포함된 백업으로 같은 위치에 보존됩니다.
@@ -26,16 +26,16 @@ bun scripts/apply-cpa-sub2-import.ts
 
 ```bash
 # 지정한 소스 checkout에만 적용합니다.
-bun scripts/apply-cpa-sub2-import.ts --target=source /path/to/opencodex
+bun scripts/patch.ts --target=source /path/to/opencodex
 
 # 전역 Bun 설치 방식으로 강제합니다.
-bun scripts/apply-cpa-sub2-import.ts --target=global
+bun scripts/patch.ts --target=global
 
 # 패치와 빌드만 수행하고 OpenCodex 재시작은 직접 합니다.
-bun scripts/apply-cpa-sub2-import.ts --no-restart
+bun scripts/patch.ts --no-restart
 
 # 변경 없이 감지된 대상을 표시합니다.
-bun scripts/apply-cpa-sub2-import.ts --print-source
+bun scripts/patch.ts --print-source
 ```
 
 소스 탐색 경로를 고정하려면 `OPENCODEX_SOURCE_DIR` 환경 변수를 설정하세요.
@@ -49,4 +49,4 @@ bun scripts/apply-cpa-sub2-import.ts --print-source
 ## 구성
 
 - `patches/cpa-sub2-token-import.patch` — OpenCodex 소스 checkout에 적용하는 패치
-- `scripts/apply-cpa-sub2-import.ts` — 대상 탐색, 패치, 빌드, 재시작 실행 스크립트
+- `scripts/patch.ts` — 대상 탐색, 패치, 빌드, 재시작 실행 스크립트

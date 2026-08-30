@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 if (args.includes("--help")) {
-  console.log("Usage: bun scripts/apply-cpa-sub2-import.ts [opencodex-source-dir] [--target=source|global] [--no-restart] [--print-source]");
+  console.log("Usage: bun scripts/patch.ts [opencodex-source-dir] [--target=source|global] [--no-restart] [--print-source]");
   process.exit(0);
 }
 

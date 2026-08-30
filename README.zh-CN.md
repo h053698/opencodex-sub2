@@ -17,7 +17,7 @@
 需要 Bun、Git 和已存在的 OpenCodex 安装。
 
 ```bash
-bun scripts/apply-cpa-sub2-import.ts
+bun scripts/patch.ts
 ```
 
 启动脚本会先查找 OpenCodex 源码 checkout。若没有找到，它会检测全局 Bun 安装，在 `~/.opencodex/patched-source/` 创建用于补丁的源码工作目录并构建，然后将全局包链接切换到该工作目录。原全局包会以带日期的备份保留在相邻位置。
@@ -26,16 +26,16 @@ bun scripts/apply-cpa-sub2-import.ts
 
 ```bash
 # 仅给指定源码 checkout 打补丁。
-bun scripts/apply-cpa-sub2-import.ts --target=source /path/to/opencodex
+bun scripts/patch.ts --target=source /path/to/opencodex
 
 # 强制使用全局 Bun 安装流程。
-bun scripts/apply-cpa-sub2-import.ts --target=global
+bun scripts/patch.ts --target=global
 
 # 仅打补丁和构建，不重启 OpenCodex。
-bun scripts/apply-cpa-sub2-import.ts --no-restart
+bun scripts/patch.ts --no-restart
 
 # 只显示检测到的目标，不作任何修改。
-bun scripts/apply-cpa-sub2-import.ts --print-source
+bun scripts/patch.ts --print-source
 ```
 
 如果需要固定源码发现路径，请设置 `OPENCODEX_SOURCE_DIR` 环境变量。
@@ -49,4 +49,4 @@ bun scripts/apply-cpa-sub2-import.ts --print-source
 ## 内容
 
 - `patches/cpa-sub2-token-import.patch` — 应用于 OpenCodex 源码 checkout 的补丁
-- `scripts/apply-cpa-sub2-import.ts` — 目标发现、打补丁、构建和重启脚本
+- `scripts/patch.ts` — 目标发现、打补丁、构建和重启脚本
